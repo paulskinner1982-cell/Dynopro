@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0c3cff">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Blast Load Calculator</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#0c3cff;color:#001f4d;padding:16px}
+input,button,textarea{padding:14px;font-size:18px;width:100%;margin-bottom:10px;border-radius:12px;border:none}
+button{background:#0c3cff;color:white;font-weight:800;cursor:pointer}
+textarea{height:100px;resize:none}
+.result{background:#e6f0ff;padding:10px;border-radius:12px;margin-top:6px}
+.countdown{background:#d0e0ff;padding:10px;border-radius:12px;margin-top:12px}
+.log{background:#b0d0ff;padding:10px;border-radius:12px;margin-top:12px;max-height:200px;overflow-y:auto;font-size:14px;}
+.log-item{margin-bottom:4px;}
+.notes{background:#e0eaff;padding:10px;border-radius:12px;margin-top:12px;}
+</style>
+</head>
+<body>
+<h1>Blast Load Calculator</h1>
+
+<!-- Calculator -->
+<label>Target Loaded KG</label>
+<input id="targetKg" type="number" placeholder="Enter target kg">
+<button onclick="calculate()">Calculate</button>
+<div class="result" id="endDisplay">Tank Reading End: -</div>
+<div class="result" id="loadedDisplay">Loaded (A-B): -</div>
+<div class="result" id="finalDisplay">C = Loaded x 1.32: -</div>
+
+<!-- Countdown -->
+<div class="countdown">
+<label>Total Days for Shift</label>
+<input id="totalDaysInput" type="number" placeholder="Enter total days of shift" min="1">
+<div id="daysDisplay">-</div>
+</div>
+
+<!-- Load Log -->
+<div class="log">
+<h3>Load Log (14-day cycle)</h3>
+<div id="logEntries"></div>
+<button onclick="resetLog()">Reset Log</button>
+</div>
+
+<!-- Notes Section -->
+<div class="notes">
+<h3>Notes</h3>
+<textarea id="notesInput" placeholder="Add your notes here..."></textarea>
+<button onclick="saveNotes()">Save Notes</button>
+<button onclick="shareNotes()">Share Notes</button>
+<div id="notesSavedMsg" style="font-size:14px;color:#001f4d"></div>
+</div>
+
+<script>
+// --- Calculator ---
+const START_KG=7495,DENSITY=1.32;
+const chart=[{inch:61,kg:31},{inch:60.5,kg:62},{inch:60,kg:93},{inch:59.5,kg:120},{inch:59,kg:148},{inch:58.5,kg:186},{inch:58,kg:224},{inch:57.5,kg:262},{inch:57,kg:300},{inch:56.5,kg:341},{inch:56,kg:383},{inch:55.5,kg:424},{inch:55,kg:466},{inch:54.5,kg:516},{inch:54,kg:567},{inch:53.5,kg:621},{inch:53,kg:676},{inch:52.5,kg:733},{inch:52,kg:791},{inch:51.5,kg:847},{inch:51,kg:904},{inch:50.5,kg:961},{inch:50,kg:1019},{inch:49.5,kg:1076},{inch:49,kg:1134},{inch:48.5,kg:1201},{inch:48,kg:1268},{inch:47.5,kg:1323},{inch:47,kg:1379},{inch:46.5,kg:1440},{inch:46,kg:1502},{inch:45.5,kg:1564},{inch:45,kg:1627},{inch:44.5,kg:1693},{inch:44,kg:1759},{inch:43.5,kg:1831},{inch:43,kg:1904},{inch:42.5,kg:1976},{inch:42,kg:2048},{inch:41.5,kg:2127},{inch:41,kg:2206},{inch:40.5,kg:2285},{inch:40,kg:2364},{inch:39.5,kg:2429},{inch:39,kg:2494},{inch:38.5,kg:2566},{inch:38,kg:2639},{inch:37.5,kg:2709},{inch:37,kg:2780},{inch:36.5,kg:2860},{inch:36,kg:2940},{inch:35.5,kg:3023},{inch:35,kg:3107},{inch:34.5,kg:3188},{inch:34,kg:3270},{inch:33.5,kg:3350},{inch:33,kg:3431},{inch:32.5,kg:3506},{inch:32,kg:3582},{inch:31.5,kg:3657},{inch:31,kg:3732},{inch:30.5,kg:3807},{inch:30,kg:3882},{inch:29.5,kg:3957},{inch:29,kg:4032},{inch:28.5,kg:4107},{inch:28,kg:4182},{inch:27.5,kg:4260},{inch:27,kg:4339},{inch:26.5,kg:4417},{inch:26,kg:4496},{inch:25.5,kg:4575},{inch:25,kg:4653},{inch:24.5,kg:4735},{inch:24,kg:4817},{inch:23.5,kg:4899},{inch:23,kg:4981},{inch:22.5,kg:5063},{inch:22,kg:5145},{inch:21.5,kg:5227},{inch:21,kg:5309},{inch:20.5,kg:5389},{inch:20,kg:5469},{inch:19.5,kg:5548},{inch:19,kg:5628},{inch:18.5,kg:5707},{inch:18,kg:5787},{inch:17.5,kg:5865},{inch:17,kg:5942},{inch:16.5,kg:6017},{inch:16,kg:6093},{inch:15.5,kg:6164},{inch:15,kg:6235},{inch:14.5,kg:6305},{inch:14,kg:6376},{inch:13.5,kg:6446},{inch:13,kg:6517},{inch:12.5,kg:6587},{inch:12,kg:6658},{inch:11.5,kg:6728},{inch:11,kg:6799},{inch:10.5,kg:6870},{inch:10,kg:6940},{inch:9.5,kg:7005},{inch:9,kg:7070},{inch:8.5,kg:7133},{inch:8,kg:7196},{inch:7.5,kg:7254},{inch:7,kg:7311},{inch:6.5,kg:7369},{inch:6,kg:7427},{inch:5.5,kg:7461},{inch:5,kg:7495}];
+
+function calculate(){
+  const t=parseFloat(document.getElementById('targetKg').value);
+  if(isNaN(t)) return;
+  let ideal=START_KG-t/DENSITY;
+  let best=chart[0],diff=Math.abs(chart[0].kg-ideal);
+  for(const r of chart){let d=Math.abs(r.kg-ideal);if(d<diff){best=r;diff=d;}}
+  let loaded=START_KG-best.kg,finalC=loaded*DENSITY;
+  document.getElementById('endDisplay').textContent=`${best.inch}" = ${best.kg} kg`;
+  document.getElementById('loadedDisplay').textContent=`7495 - ${best.kg} = ${loaded} kg`;
+  document.getElementById('finalDisplay').textContent=`${finalC.toFixed(2)} kg`;
+  addLog(best.inch, best.kg, loaded, finalC.toFixed(2));
+}
+
+// --- Countdown & Load Log ---
+let totalDays=14;
+let logEntries=[];
+const totalInput=document.getElementById("totalDaysInput");
+const daysDisplay=document.getElementById("daysDisplay");
+const logContainer=document.getElementById("logEntries");
+
+totalInput.addEventListener("input",()=>{
+    let val=parseInt(totalInput.value);
+    if(!isNaN(val)&&val>0){totalDays=val;updateCountdown();}
+});
+
+function updateCountdown(){
+    const remaining=Math.max(0,totalDays-logEntries.length);
+    daysDisplay.textContent=`${remaining} days left of ${totalDays}`;
+}
+
+function addLog(inch,kg,loaded,finalC){
+    logEntries.push({inch,kg,loaded,finalC});
+    if(logEntries.length>14) logEntries.shift();
+    renderLog();
+    updateCountdown();
+}
+
+function renderLog(){
+    logContainer.innerHTML="";
+    logEntries.forEach((entry,i)=>{
+        const div=document.createElement("div");
+        div.className="log-item";
+        div.textContent=`Day ${i+1}: End=${entry.inch}" (${entry.kg}kg), Loaded=${entry.loaded}kg, C=${entry.finalC}kg`;
+        logContainer.appendChild(div);
+    });
+}
+
+function resetLog(){logEntries=[];renderLog();updateCountdown();}
+
+// --- Notes Section ---
+const notesInput=document.getElementById("notesInput");
+const notesSavedMsg=document.getElementById("notesSavedMsg");
+
+function saveNotes(){
+    localStorage.setItem("blastNotes", notesInput.value);
+    notesSavedMsg.textContent="Notes saved!";
+    setTimeout(()=>{notesSavedMsg.textContent="";},2000);
+}
+
+// Load saved notes on start
+if(localStorage.getItem("blastNotes")){
+    notesInput.value=localStorage.getItem("blastNotes");
+}
+
+function shareNotes(){
+    const text=notesInput.value;
+    if(navigator.share){
+        navigator.share({title:"Blast Load Notes", text});
+    }else{
+        navigator.clipboard.writeText(text).then(()=>alert("Notes copied to clipboard!"));
+    }
+}
+</script>
+</body>
+</html>
